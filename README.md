@@ -20,11 +20,11 @@ $ go get github.com/ksoichiro/glc
 
 ## Command line options
 
-| Option  | Meaning |
-| ------- | ------- |
-| `-token | Your private token. |
-| `-url   | GitLab root URL.    |
-| `-out   | Output CSV file.   |
+| Option   | Meaning |
+| -------- | ------- |
+| `-token` | Your private token. |
+| `-url`   | GitLab root URL.    |
+| `-out`   | Output CSV file.   |
 
 ## Config
 
