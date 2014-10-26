@@ -1,0 +1,15 @@
+language: go
+
+go:
+  - 1.2
+
+install:
+  - go get code.google.com/p/go.text/encoding/japanese
+  - go get code.google.com/p/go.text/transform
+
+before_script:
+  - export PATH=$HOME/gopath/bin:$PATH
+
+script:
+  - go test -covermode=count -coverprofile=profile.cov
+
