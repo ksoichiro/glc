@@ -19,6 +19,16 @@ import (
 	"code.google.com/p/go.text/transform"
 )
 
+const (
+	ExitCodeError = 1
+)
+
+var (
+	resolvedUrl   string
+	resolvedToken string
+	outputPath    string
+)
+
 type Issue struct {
 	Id          int
 	Iid         int
@@ -42,15 +52,27 @@ type User struct {
 }
 
 func main() {
-	var (
-		token = flag.String("token", "", "Your private token.")
-		url   = flag.String("url", "", "GitLab root URL.")
-		out   = flag.String("out", "", "Output CSV file.")
-	)
-	flag.Parse()
+	if len(os.Args) < 2 {
+		printUsage()
+		os.Exit(ExitCodeError)
+	}
 
-	var resolvedToken string
-	var resolvedUrl string
+	switch os.Args[1] {
+	case "issues", "i":
+	default:
+		printUsage()
+		os.Exit(ExitCodeError)
+	}
+
+	// Options for command
+	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	var (
+		token = fs.String("token", "", "Your private token.")
+		url   = fs.String("url", "", "GitLab root URL.")
+		out   = fs.String("out", "", "Output CSV file.")
+	)
+	fs.Parse(os.Args[2:])
+
 	usr, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
@@ -108,7 +130,17 @@ func main() {
 		fmt.Println("Output file name is required(-out)")
 		return
 	}
+	outputPath = *out
 
+	if len(os.Args) == 1 {
+		printUsage()
+		os.Exit(ExitCodeError)
+	}
+
+	getIssues()
+}
+
+func getIssues() {
 	var modUrl = resolvedUrl
 	if strings.HasSuffix(modUrl, "/") {
 		modUrl = strings.TrimSuffix(modUrl, "/")
@@ -130,7 +162,7 @@ func main() {
 		fmt.Println("error: ", err)
 	}
 
-	outFile, _ := os.OpenFile(*out, os.O_WRONLY|os.O_CREATE, 0600)
+	outFile, _ := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE, 0600)
 	sjisWriter := transform.NewWriter(outFile, japanese.ShiftJIS.NewEncoder())
 	writer := csv.NewWriter(sjisWriter)
 
@@ -149,4 +181,13 @@ func main() {
 		})
 	}
 	writer.Flush()
+}
+
+func printUsage() {
+	fmt.Fprintf(os.Stderr, `glc - GitLab command line interface, especially for managing issues.
+Usage: %s command
+command:
+  issues   get issues
+  projects get projects
+`, os.Args[0])
 }

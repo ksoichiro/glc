@@ -9,8 +9,26 @@ GitLab command line interface, especially for managing issues.
 Get issues:
 
 ```sh
-$ glc -token=YOUR_PRIVATE_TOKEN -url=http://localhost:9664 -out=test.csv
+$ glc issues -token=YOUR_PRIVATE_TOKEN -url=http://localhost:9664 -out=test.csv
+(short)
+$ glc i -token=YOUR_PRIVATE_TOKEN -url=http://localhost:9664 -out=test.csv
+(with .glc)
+$ glc i -out=test.csv
 ```
+
+### Commands
+
+| Command       | Meaning |
+| ------------- | ------- |
+| `issues`, `i` | Get issues |
+
+### Options
+
+| Option   | Meaning |
+| -------- | ------- |
+| `-token` | Your private token. |
+| `-url`   | GitLab root URL.    |
+| `-out`   | Output CSV file.   |
 
 ## Install
 
@@ -19,14 +37,6 @@ $ go get code.google.com/p/go.text/encoding/japanese
 $ go get code.google.com/p/go.text/transform
 $ go get github.com/ksoichiro/glc
 ```
-
-## Command line options
-
-| Option   | Meaning |
-| -------- | ------- |
-| `-token` | Your private token. |
-| `-url`   | GitLab root URL.    |
-| `-out`   | Output CSV file.   |
 
 ## Config
 
