@@ -1,5 +1,7 @@
 # glc
 
+[![Build Status](https://travis-ci.org/ksoichiro/glc.svg?branch=master)](https://travis-ci.org/ksoichiro/glc)
+
 GitLab command line interface, especially for managing issues.
 
 ## Usage
