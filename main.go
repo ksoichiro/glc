@@ -23,6 +23,8 @@ const (
 	ExitCodeError    = 1
 	EncodingShiftJIS = "sjis"
 	EncodingUTF8     = "utf8"
+	ModeGetProjects  = "get projects"
+	ModeGetIssues    = "get issues"
 )
 
 var (
@@ -30,7 +32,24 @@ var (
 	ResolvedToken string
 	OutputPath    string
 	CsvEncoding   string
+	ProjectId     string
 )
+
+type Project struct {
+	Id                int
+	Description       string
+	Public            bool
+	VisibilityLevel   int    `json:"visibility_level"`
+	SshUrlToRepo      string `json:"ssh_url_to_repo"`
+	HttpUrlToRepo     string `json:"http_url_to_repo"`
+	WebUrl            string
+	Name              string
+	NameWithNamespace string `json:"name_with_namespace"`
+	Path              string
+	PathWithNamespace string `json:"path_with_namespace"`
+	IssuesEnabled     bool
+	CreatedAt         string `json:"created_at"`
+}
 
 type Issue struct {
 	Id          int
@@ -60,8 +79,12 @@ func main() {
 		os.Exit(ExitCodeError)
 	}
 
+	var mode string
 	switch os.Args[1] {
+	case "projects", "p":
+		mode = ModeGetProjects
 	case "issues", "i":
+		mode = ModeGetIssues
 	default:
 		printUsage()
 		os.Exit(ExitCodeError)
@@ -74,6 +97,7 @@ func main() {
 		url         = fs.String("url", "", "GitLab root URL.")
 		out         = fs.String("out", "", "Output CSV file.")
 		csvEncoding = fs.String("csvEncoding", EncodingShiftJIS, "Output encoding for CSV file.")
+		projectId   = fs.String("project", "", "Target project ID. Optional.")
 	)
 	fs.Parse(os.Args[2:])
 
@@ -81,6 +105,9 @@ func main() {
 		*csvEncoding = EncodingShiftJIS
 	}
 	CsvEncoding = *csvEncoding
+	if *projectId != "" {
+		ProjectId = *projectId
+	}
 
 	usr, err := user.Current()
 	if err != nil {
@@ -146,7 +173,60 @@ func main() {
 		os.Exit(ExitCodeError)
 	}
 
-	getIssues()
+	switch mode {
+	case ModeGetProjects:
+		getProjects()
+	case ModeGetIssues:
+		getIssues()
+	}
+}
+
+func getProjects() {
+	var modUrl = ResolvedUrl
+	if strings.HasSuffix(modUrl, "/") {
+		modUrl = strings.TrimSuffix(modUrl, "/")
+	}
+
+	client := &http.Client{}
+	path := "/api/v3/projects"
+	req, err := http.NewRequest("GET", modUrl+path, nil)
+	req.Header.Add("PRIVATE-TOKEN", ResolvedToken)
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Printf("error while executing request: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	var projects []Project
+	err = json.Unmarshal(body, &projects)
+	if err != nil {
+		fmt.Println("error while unmarshaling json: ", err)
+		fmt.Println(string(body))
+	}
+
+	outFile, _ := os.OpenFile(OutputPath, os.O_WRONLY|os.O_CREATE, 0600)
+	var writer *csv.Writer
+	if CsvEncoding == EncodingShiftJIS {
+		sjisWriter := transform.NewWriter(outFile, japanese.ShiftJIS.NewEncoder())
+		writer = csv.NewWriter(sjisWriter)
+	} else {
+		writer = csv.NewWriter(outFile)
+	}
+
+	writer.Write([]string{"Id", "Name", "NameWithNamespace", "Path", "PathWithNamespace", "IssuesEnabled", "CreatedAt"})
+	for _, project := range projects {
+		writer.Write([]string{
+			fmt.Sprintf("%d", project.Id),
+			project.Name,
+			project.NameWithNamespace,
+			project.Path,
+			project.PathWithNamespace,
+			fmt.Sprintf("%t", project.IssuesEnabled),
+			project.CreatedAt,
+		})
+	}
+	writer.Flush()
 }
 
 func getIssues() {
@@ -156,11 +236,16 @@ func getIssues() {
 	}
 
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", modUrl+"/api/v3/issues", nil)
+	path := "/api/v3"
+	if ProjectId != "" {
+		path += "/projects/" + strings.Replace(ProjectId, "/", "%2F", 1)
+	}
+	path += "/issues"
+	req, err := http.NewRequest("GET", modUrl+path, nil)
 	req.Header.Add("PRIVATE-TOKEN", ResolvedToken)
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Printf("%v\n", err)
+		fmt.Printf("error while executing request: %v\n", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -168,7 +253,8 @@ func getIssues() {
 	var issues []Issue
 	err = json.Unmarshal(body, &issues)
 	if err != nil {
-		fmt.Println("error: ", err)
+		fmt.Println("error while unmarshaling json: ", err)
+		fmt.Println(string(body))
 	}
 
 	outFile, _ := os.OpenFile(OutputPath, os.O_WRONLY|os.O_CREATE, 0600)
