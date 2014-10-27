@@ -20,13 +20,16 @@ import (
 )
 
 const (
-	ExitCodeError = 1
+	ExitCodeError    = 1
+	EncodingShiftJIS = "sjis"
+	EncodingUTF8     = "utf8"
 )
 
 var (
-	resolvedUrl   string
-	resolvedToken string
-	outputPath    string
+	ResolvedUrl   string
+	ResolvedToken string
+	OutputPath    string
+	CsvEncoding   string
 )
 
 type Issue struct {
@@ -67,11 +70,17 @@ func main() {
 	// Options for command
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	var (
-		token = fs.String("token", "", "Your private token.")
-		url   = fs.String("url", "", "GitLab root URL.")
-		out   = fs.String("out", "", "Output CSV file.")
+		token       = fs.String("token", "", "Your private token.")
+		url         = fs.String("url", "", "GitLab root URL.")
+		out         = fs.String("out", "", "Output CSV file.")
+		csvEncoding = fs.String("csvEncoding", EncodingShiftJIS, "Output encoding for CSV file.")
 	)
 	fs.Parse(os.Args[2:])
+
+	if *csvEncoding == "" || (*csvEncoding != EncodingUTF8 && *csvEncoding != EncodingShiftJIS) {
+		*csvEncoding = EncodingShiftJIS
+	}
+	CsvEncoding = *csvEncoding
 
 	usr, err := user.Current()
 	if err != nil {
@@ -98,9 +107,9 @@ func main() {
 					v := groups[2]
 					switch k {
 					case "token":
-						resolvedToken = v
+						ResolvedToken = v
 					case "url":
-						resolvedUrl = v
+						ResolvedUrl = v
 					}
 				}
 			}
@@ -111,17 +120,17 @@ func main() {
 	}
 
 	if *token != "" {
-		resolvedToken = *token
+		ResolvedToken = *token
 	}
 	if *url != "" {
-		resolvedUrl = *url
+		ResolvedUrl = *url
 	}
 
-	if resolvedToken == "" {
+	if ResolvedToken == "" {
 		fmt.Println("Private token is required(-token)")
 		return
 	}
-	if resolvedUrl == "" {
+	if ResolvedUrl == "" {
 		fmt.Println("GitLab URL is required(-url)")
 		return
 	}
@@ -130,7 +139,7 @@ func main() {
 		fmt.Println("Output file name is required(-out)")
 		return
 	}
-	outputPath = *out
+	OutputPath = *out
 
 	if len(os.Args) == 1 {
 		printUsage()
@@ -141,14 +150,14 @@ func main() {
 }
 
 func getIssues() {
-	var modUrl = resolvedUrl
+	var modUrl = ResolvedUrl
 	if strings.HasSuffix(modUrl, "/") {
 		modUrl = strings.TrimSuffix(modUrl, "/")
 	}
 
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", modUrl+"/api/v3/issues", nil)
-	req.Header.Add("PRIVATE-TOKEN", resolvedToken)
+	req.Header.Add("PRIVATE-TOKEN", ResolvedToken)
 	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Printf("%v\n", err)
@@ -162,9 +171,14 @@ func getIssues() {
 		fmt.Println("error: ", err)
 	}
 
-	outFile, _ := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE, 0600)
-	sjisWriter := transform.NewWriter(outFile, japanese.ShiftJIS.NewEncoder())
-	writer := csv.NewWriter(sjisWriter)
+	outFile, _ := os.OpenFile(OutputPath, os.O_WRONLY|os.O_CREATE, 0600)
+	var writer *csv.Writer
+	if CsvEncoding == EncodingShiftJIS {
+		sjisWriter := transform.NewWriter(outFile, japanese.ShiftJIS.NewEncoder())
+		writer = csv.NewWriter(sjisWriter)
+	} else {
+		writer = csv.NewWriter(outFile)
+	}
 
 	writer.Write([]string{"Id", "ProjectId", "Title", "Descrption", "Assignee", "Author", "State", "UpdatedAt", "CreatedAt"})
 	for _, issue := range issues {

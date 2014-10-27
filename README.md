@@ -24,11 +24,12 @@ $ glc i -out=test.csv
 
 ### Options
 
-| Option   | Meaning |
-| -------- | ------- |
-| `-token` | Your private token. |
-| `-url`   | GitLab root URL.    |
-| `-out`   | Output CSV file.   |
+| Option   | Default | Meaning |
+| -------- | ------- | ------- |
+| `-token` | (none)  | Your private token. |
+| `-url`   | (none)  | GitLab root URL.    |
+| `-out`   | (none)  | Output CSV file.   |
+| `-csvEncoding` | sjis | Output encoding for CSV file.(sjis, utf8) |
 
 ## Install
 
