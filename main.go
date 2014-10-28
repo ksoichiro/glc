@@ -170,17 +170,7 @@ func getProjects() {
 		modUrl = strings.TrimSuffix(modUrl, "/")
 	}
 
-	client := &http.Client{}
-	path := "/api/v3/projects"
-	req, err := http.NewRequest("GET", modUrl+path, nil)
-	req.Header.Add("PRIVATE-TOKEN", ResolvedToken)
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Printf("error while executing request: %v\n\n", err)
-		return
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := accessGitLab("/projects", "GET")
 	var projects []Project
 	err = json.Unmarshal(body, &projects)
 	if err != nil {
@@ -220,26 +210,12 @@ func getIssues() {
 		ProjectId = *projectId
 	}
 
-	var modUrl = ResolvedUrl
-	if strings.HasSuffix(modUrl, "/") {
-		modUrl = strings.TrimSuffix(modUrl, "/")
-	}
-
-	client := &http.Client{}
-	path := "/api/v3"
+	var path string
 	if ProjectId != "" {
-		path += "/projects/" + strings.Replace(ProjectId, "/", "%2F", 1)
+		path = "/projects/" + strings.Replace(ProjectId, "/", "%2F", 1)
 	}
 	path += "/issues"
-	req, err := http.NewRequest("GET", modUrl+path, nil)
-	req.Header.Add("PRIVATE-TOKEN", ResolvedToken)
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Printf("error while executing request: %v\n", err)
-		return
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := accessGitLab(path, "GET")
 	var issues []Issue
 	err = json.Unmarshal(body, &issues)
 	if err != nil {
@@ -271,6 +247,28 @@ func getIssues() {
 		})
 	}
 	writer.Flush()
+}
+
+func accessGitLab(apiPath string, method string) (result []byte, err error) {
+	var modUrl = ResolvedUrl
+	if strings.HasSuffix(modUrl, "/") {
+		modUrl = strings.TrimSuffix(modUrl, "/")
+	}
+
+	client := &http.Client{}
+	path := "/api/v3" + apiPath
+	req, err := http.NewRequest(method, modUrl+path, nil)
+	if err != nil {
+		return
+	}
+	req.Header.Add("PRIVATE-TOKEN", ResolvedToken)
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	result, err = ioutil.ReadAll(resp.Body)
+	return
 }
 
 func printUsage() {
