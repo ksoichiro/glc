@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"os/user"
@@ -23,8 +22,6 @@ const (
 	ExitCodeError    = 1
 	EncodingShiftJIS = "sjis"
 	EncodingUTF8     = "utf8"
-	ModeGetProjects  = "get projects"
-	ModeGetIssues    = "get issues"
 )
 
 var (
@@ -74,110 +71,96 @@ type User struct {
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		printUsage()
+	// Read user's config if exists
+	usr, err := user.Current()
+	if err != nil {
 		os.Exit(ExitCodeError)
 	}
-
-	var mode string
-	switch os.Args[1] {
-	case "projects", "p":
-		mode = ModeGetProjects
-	case "issues", "i":
-		mode = ModeGetIssues
-	default:
-		printUsage()
-		os.Exit(ExitCodeError)
+	configPath := filepath.Join(usr.HomeDir, ".glc")
+	configFile, err := os.OpenFile(configPath, os.O_RDONLY, 0600)
+	if err == nil || os.IsExist(err) {
+		lines := []string{}
+		scanner := bufio.NewScanner(configFile)
+		for scanner.Scan() {
+			lines = append(lines, scanner.Text())
+		}
+		if serr := scanner.Err(); serr != nil {
+			fmt.Fprintf(os.Stderr, "Failed to scan file %s: %v\n", configPath, err)
+		} else {
+			for _, line := range lines {
+				r := regexp.MustCompile("^[ \t]*([^=]+)[ \t]*=[ \t]*(.*)$")
+				groups := r.FindStringSubmatch(line)
+				if groups == nil {
+					continue
+				}
+				k := groups[1]
+				v := groups[2]
+				switch k {
+				case "token":
+					ResolvedToken = v
+				case "url":
+					ResolvedUrl = v
+				}
+			}
+		}
 	}
+	defer configFile.Close()
 
-	// Options for command
-	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	// Global options
 	var (
-		token       = fs.String("token", "", "Your private token.")
-		url         = fs.String("url", "", "GitLab root URL.")
-		out         = fs.String("out", "", "Output CSV file.")
-		csvEncoding = fs.String("csvEncoding", EncodingShiftJIS, "Output encoding for CSV file.")
-		projectId   = fs.String("project", "", "Target project ID. Optional.")
+		token       = flag.String("token", "", "Your private token.")
+		url         = flag.String("url", "", "GitLab root URL.")
+		out         = flag.String("out", "", "Output CSV file.")
+		csvEncoding = flag.String("csvEncoding", EncodingShiftJIS, "Output encoding for CSV file.")
 	)
-	fs.Parse(os.Args[2:])
+	flag.Parse()
+
+	// Resolve global settings.
+	// Command line options override user's config
+	if *token != "" {
+		ResolvedToken = *token
+	}
+	if ResolvedToken == "" {
+		fmt.Fprintln(os.Stderr, "Private token is required(-token)\n")
+		printUsage()
+		os.Exit(ExitCodeError)
+	}
+	if *url != "" {
+		ResolvedUrl = *url
+	}
+	if ResolvedUrl == "" {
+		fmt.Fprintln(os.Stderr, "GitLab URL is required(-url)\n")
+		printUsage()
+		os.Exit(ExitCodeError)
+	}
+	if *out == "" {
+		fmt.Fprintln(os.Stderr, "Output file name is required(-out)\n")
+		printUsage()
+		os.Exit(ExitCodeError)
+	}
+	OutputPath = *out
 
 	if *csvEncoding == "" || (*csvEncoding != EncodingUTF8 && *csvEncoding != EncodingShiftJIS) {
 		*csvEncoding = EncodingShiftJIS
 	}
 	CsvEncoding = *csvEncoding
-	if *projectId != "" {
-		ProjectId = *projectId
-	}
 
-	usr, err := user.Current()
-	if err != nil {
-		log.Fatal(err)
-	} else {
-		configPath := filepath.Join(usr.HomeDir, ".glc")
-		configFile, err := os.OpenFile(configPath, os.O_RDONLY, 0600)
-		if err == nil || os.IsExist(err) {
-			lines := []string{}
-			scanner := bufio.NewScanner(configFile)
-			for scanner.Scan() {
-				lines = append(lines, scanner.Text())
-			}
-			if serr := scanner.Err(); serr != nil {
-				fmt.Fprintf(os.Stderr, "Failed to scan file %s: %v\n", configPath, err)
-			} else {
-				for _, line := range lines {
-					r := regexp.MustCompile("^[ \t]*([^=]+)[ \t]*=[ \t]*(.*)$")
-					groups := r.FindStringSubmatch(line)
-					if groups == nil {
-						continue
-					}
-					k := groups[1]
-					v := groups[2]
-					switch k {
-					case "token":
-						ResolvedToken = v
-					case "url":
-						ResolvedUrl = v
-					}
-				}
-			}
-		} else {
-			fmt.Println(err)
-		}
-		defer configFile.Close()
-	}
-
-	if *token != "" {
-		ResolvedToken = *token
-	}
-	if *url != "" {
-		ResolvedUrl = *url
-	}
-
-	if ResolvedToken == "" {
-		fmt.Println("Private token is required(-token)")
-		return
-	}
-	if ResolvedUrl == "" {
-		fmt.Println("GitLab URL is required(-url)")
-		return
-	}
-
-	if *out == "" {
-		fmt.Println("Output file name is required(-out)")
-		return
-	}
-	OutputPath = *out
-
-	if len(os.Args) == 1 {
+	// Get objective: projects, issues, ...
+	if flag.NArg() < 1 {
+		fmt.Fprintln(os.Stderr, "Command is required.\n")
 		printUsage()
 		os.Exit(ExitCodeError)
 	}
 
-	switch mode {
-	case ModeGetProjects:
+	switch flag.Arg(0) {
+	case "projects", "p":
 		getProjects()
-	case ModeGetIssues:
+	case "issues", "i":
 		getIssues()
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown command: %s\n\n", flag.Arg(0))
+		printUsage()
+		os.Exit(ExitCodeError)
 	}
 }
 
@@ -193,7 +176,7 @@ func getProjects() {
 	req.Header.Add("PRIVATE-TOKEN", ResolvedToken)
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Printf("error while executing request: %v\n", err)
+		fmt.Printf("error while executing request: %v\n\n", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -201,7 +184,7 @@ func getProjects() {
 	var projects []Project
 	err = json.Unmarshal(body, &projects)
 	if err != nil {
-		fmt.Println("error while unmarshaling json: ", err)
+		fmt.Println("error while unmarshaling json: %v\n\n", err)
 		fmt.Println(string(body))
 	}
 
@@ -230,6 +213,13 @@ func getProjects() {
 }
 
 func getIssues() {
+	// Get command options
+	var projectId = flag.String("project", "", "Target project ID. Optional.")
+	flag.Parse()
+	if *projectId != "" {
+		ProjectId = *projectId
+	}
+
 	var modUrl = ResolvedUrl
 	if strings.HasSuffix(modUrl, "/") {
 		modUrl = strings.TrimSuffix(modUrl, "/")
@@ -284,10 +274,21 @@ func getIssues() {
 }
 
 func printUsage() {
-	fmt.Fprintf(os.Stderr, `glc - GitLab command line interface, especially for managing issues.
-Usage: %s command
+	fmt.Fprintln(os.Stderr,
+		`usage: glc [-token=<private_token>] [-url=<gitlab_url>]
+           -out=<csv_file_path> [-csvEncoding=<encoding>]
+           <command> [<args>]
+options:
+  -token        Your private token.
+                This is required unless you define it in ~/.glc.
+  -url          GitLab root URL.
+                This is required unless you define it in ~/.glc.
+  -out          Output CSV file. Required.
+  -csvEncoding  Output encoding for CSV file.
+                "sjis" and "utf8" is available.
+                "sjis" is default.
 command:
-  issues   get issues
-  projects get projects
-`, os.Args[0])
+  p[rojects]    Get/update projects
+  i[ssues]      Get/update issues
+`)
 }
