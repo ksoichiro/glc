@@ -156,6 +156,13 @@ func main() {
 	case "projects", "p":
 		getProjects()
 	case "issues", "i":
+		// Get command options
+		var projectId = flag.String("project", "", "Target project ID. Optional.")
+		os.Args = flag.Args()
+		flag.Parse()
+		if *projectId != "" {
+			ProjectId = *projectId
+		}
 		getIssues()
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n\n", flag.Arg(0))
@@ -203,13 +210,6 @@ func getProjects() {
 }
 
 func getIssues() {
-	// Get command options
-	var projectId = flag.String("project", "", "Target project ID. Optional.")
-	flag.Parse()
-	if *projectId != "" {
-		ProjectId = *projectId
-	}
-
 	var path string
 	if ProjectId != "" {
 		path = "/projects/" + strings.Replace(ProjectId, "/", "%2F", 1)
