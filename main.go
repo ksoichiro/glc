@@ -22,6 +22,7 @@ const (
 	ExitCodeError    = 1
 	EncodingShiftJIS = "sjis"
 	EncodingUTF8     = "utf8"
+	IssuesPerPage    = 100
 )
 
 var (
@@ -177,7 +178,7 @@ func getProjects() {
 		modUrl = strings.TrimSuffix(modUrl, "/")
 	}
 
-	body, err := accessGitLab("/projects", "GET")
+	body, err := accessGitLab("/projects", "GET", nil)
 	var projects []Project
 	err = json.Unmarshal(body, &projects)
 	if err != nil {
@@ -215,7 +216,8 @@ func getIssues() {
 		path = "/projects/" + strings.Replace(ProjectId, "/", "%2F", 1)
 	}
 	path += "/issues"
-	body, err := accessGitLab(path, "GET")
+	params := map[string]string{"per_page": fmt.Sprint(IssuesPerPage)}
+	body, err := accessGitLab(path, "GET", params)
 	var issues []Issue
 	err = json.Unmarshal(body, &issues)
 	if err != nil {
@@ -249,7 +251,7 @@ func getIssues() {
 	writer.Flush()
 }
 
-func accessGitLab(apiPath string, method string) (result []byte, err error) {
+func accessGitLab(apiPath string, method string, params map[string]string) (result []byte, err error) {
 	var modUrl = ResolvedUrl
 	if strings.HasSuffix(modUrl, "/") {
 		modUrl = strings.TrimSuffix(modUrl, "/")
@@ -257,6 +259,18 @@ func accessGitLab(apiPath string, method string) (result []byte, err error) {
 
 	client := &http.Client{}
 	path := "/api/v3" + apiPath
+	if params != nil {
+		path += "?"
+		first := true
+		for k, v := range params {
+			if first {
+				first = false
+			} else {
+				path += "&"
+			}
+			path += k + "=" + v
+		}
+	}
 	req, err := http.NewRequest(method, modUrl+path, nil)
 	if err != nil {
 		return
