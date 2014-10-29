@@ -188,15 +188,8 @@ func getProjects() {
 		os.Exit(ExitCodeError)
 	}
 
-	outFile, _ := os.OpenFile(OutputPath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0600)
-	var writer *csv.Writer
-	if CsvEncoding == EncodingShiftJIS {
-		sjisWriter := transform.NewWriter(outFile, japanese.ShiftJIS.NewEncoder())
-		writer = csv.NewWriter(sjisWriter)
-	} else {
-		writer = csv.NewWriter(outFile)
-	}
-
+	outFile, writer := newWriterForFile()
+	defer outFile.Close()
 	writer.Write([]string{"Id", "Name", "NameWithNamespace", "Path", "PathWithNamespace", "IssuesEnabled", "CreatedAt"})
 	for _, project := range projects {
 		writer.Write([]string{
@@ -229,15 +222,8 @@ func getIssues() {
 		os.Exit(ExitCodeError)
 	}
 
-	outFile, _ := os.OpenFile(OutputPath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0600)
-	var writer *csv.Writer
-	if CsvEncoding == EncodingShiftJIS {
-		sjisWriter := transform.NewWriter(outFile, japanese.ShiftJIS.NewEncoder())
-		writer = csv.NewWriter(sjisWriter)
-	} else {
-		writer = csv.NewWriter(outFile)
-	}
-
+	outFile, writer := newWriterForFile()
+	defer outFile.Close()
 	writer.Write([]string{"Id", "ProjectId", "Title", "Descrption", "Assignee", "Author", "State", "UpdatedAt", "CreatedAt"})
 	for _, issue := range issues {
 		writer.Write([]string{
@@ -299,6 +285,17 @@ func unmarshalResult(body []byte, obj interface{}) (err error) {
 	if err != nil {
 		fmt.Println("error while unmarshaling json: %v\n\n", err)
 		fmt.Println(string(body))
+	}
+	return
+}
+
+func newWriterForFile() (outFile *os.File, writer *csv.Writer) {
+	outFile, _ = os.OpenFile(OutputPath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0600)
+	if CsvEncoding == EncodingShiftJIS {
+		sjisWriter := transform.NewWriter(outFile, japanese.ShiftJIS.NewEncoder())
+		writer = csv.NewWriter(sjisWriter)
+	} else {
+		writer = csv.NewWriter(outFile)
 	}
 	return
 }
