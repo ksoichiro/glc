@@ -186,7 +186,7 @@ func getProjects() {
 		fmt.Println(string(body))
 	}
 
-	outFile, _ := os.OpenFile(OutputPath, os.O_WRONLY|os.O_CREATE, 0600)
+	outFile, _ := os.OpenFile(OutputPath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0600)
 	var writer *csv.Writer
 	if CsvEncoding == EncodingShiftJIS {
 		sjisWriter := transform.NewWriter(outFile, japanese.ShiftJIS.NewEncoder())
@@ -225,7 +225,7 @@ func getIssues() {
 		fmt.Println(string(body))
 	}
 
-	outFile, _ := os.OpenFile(OutputPath, os.O_WRONLY|os.O_CREATE, 0600)
+	outFile, _ := os.OpenFile(OutputPath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0600)
 	var writer *csv.Writer
 	if CsvEncoding == EncodingShiftJIS {
 		sjisWriter := transform.NewWriter(outFile, japanese.ShiftJIS.NewEncoder())
