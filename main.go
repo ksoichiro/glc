@@ -134,12 +134,9 @@ func main() {
 		printUsage()
 		os.Exit(ExitCodeError)
 	}
-	if *out == "" {
-		fmt.Fprintln(os.Stderr, "Output file name is required(-out)\n")
-		printUsage()
-		os.Exit(ExitCodeError)
+	if *out != "" {
+		OutputPath = *out
 	}
-	OutputPath = *out
 
 	if *csvEncoding == "" || (*csvEncoding != EncodingUTF8 && *csvEncoding != EncodingShiftJIS) {
 		*csvEncoding = EncodingShiftJIS
@@ -189,7 +186,9 @@ func getProjects() {
 	}
 
 	outFile, writer := newWriterForFile()
-	defer outFile.Close()
+	if outFile != nil {
+		outFile.Close()
+	}
 	writer.Write([]string{"Id", "Name", "NameWithNamespace", "Path", "PathWithNamespace", "IssuesEnabled", "CreatedAt"})
 	for _, project := range projects {
 		writer.Write([]string{
@@ -223,7 +222,9 @@ func getIssues() {
 	}
 
 	outFile, writer := newWriterForFile()
-	defer outFile.Close()
+	if outFile != nil {
+		outFile.Close()
+	}
 	writer.Write([]string{"Id", "ProjectId", "Title", "Descrption", "Assignee", "Author", "State", "UpdatedAt", "CreatedAt"})
 	for _, issue := range issues {
 		writer.Write([]string{
@@ -290,9 +291,20 @@ func unmarshalResult(body []byte, obj interface{}) (err error) {
 }
 
 func newWriterForFile() (outFile *os.File, writer *csv.Writer) {
-	outFile, _ = os.OpenFile(OutputPath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0600)
-	if CsvEncoding == EncodingShiftJIS {
-		sjisWriter := transform.NewWriter(outFile, japanese.ShiftJIS.NewEncoder())
+	var file *os.File
+	var encoding string
+	if OutputPath == "" {
+		// STDOUT
+		file = os.Stdout
+		encoding = EncodingUTF8
+	} else {
+		// CSV
+		file, _ = os.OpenFile(OutputPath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0600)
+		outFile = file
+		encoding = CsvEncoding
+	}
+	if encoding == EncodingShiftJIS {
+		sjisWriter := transform.NewWriter(file, japanese.ShiftJIS.NewEncoder())
 		writer = csv.NewWriter(sjisWriter)
 	} else {
 		writer = csv.NewWriter(outFile)
