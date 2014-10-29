@@ -179,11 +179,13 @@ func getProjects() {
 	}
 
 	body, err := accessGitLab("/projects", "GET", nil)
-	var projects []Project
-	err = json.Unmarshal(body, &projects)
 	if err != nil {
-		fmt.Println("error while unmarshaling json: %v\n\n", err)
-		fmt.Println(string(body))
+		os.Exit(ExitCodeError)
+	}
+	var projects []Project
+	err = unmarshalResult(body, &projects)
+	if err != nil {
+		os.Exit(ExitCodeError)
 	}
 
 	outFile, _ := os.OpenFile(OutputPath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0600)
@@ -218,11 +220,13 @@ func getIssues() {
 	path += "/issues"
 	params := map[string]string{"per_page": fmt.Sprint(IssuesPerPage)}
 	body, err := accessGitLab(path, "GET", params)
-	var issues []Issue
-	err = json.Unmarshal(body, &issues)
 	if err != nil {
-		fmt.Println("error while unmarshaling json: ", err)
-		fmt.Println(string(body))
+		os.Exit(ExitCodeError)
+	}
+	var issues []Issue
+	err = unmarshalResult(body, &issues)
+	if err != nil {
+		os.Exit(ExitCodeError)
 	}
 
 	outFile, _ := os.OpenFile(OutputPath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0600)
@@ -273,15 +277,29 @@ func accessGitLab(apiPath string, method string, params map[string]string) (resu
 	}
 	req, err := http.NewRequest(method, modUrl+path, nil)
 	if err != nil {
+		fmt.Println("error while accessing to GitLab: ", err)
 		return
 	}
 	req.Header.Add("PRIVATE-TOKEN", ResolvedToken)
 	resp, err := client.Do(req)
 	if err != nil {
+		fmt.Println("error while accessing to GitLab: ", err)
 		return
 	}
 	defer resp.Body.Close()
 	result, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("error while accessing to GitLab: ", err)
+	}
+	return
+}
+
+func unmarshalResult(body []byte, obj interface{}) (err error) {
+	err = json.Unmarshal(body, obj)
+	if err != nil {
+		fmt.Println("error while unmarshaling json: %v\n\n", err)
+		fmt.Println(string(body))
+	}
 	return
 }
 
