@@ -307,7 +307,7 @@ func newWriterForFile() (outFile *os.File, writer *csv.Writer) {
 		sjisWriter := transform.NewWriter(file, japanese.ShiftJIS.NewEncoder())
 		writer = csv.NewWriter(sjisWriter)
 	} else {
-		writer = csv.NewWriter(outFile)
+		writer = csv.NewWriter(file)
 	}
 	return
 }
