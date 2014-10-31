@@ -48,6 +48,10 @@ token=YOUR_PRIVATE_TOKEN
 url=http://YOUR_GITLAB_ROOT_URL
 ```
 
+## Compatibility
+
+* GitLab v6.6.4
+
 ## License
 
 Copyright (c) 2014 Soichiro Kashima  
