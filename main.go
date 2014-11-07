@@ -31,6 +31,7 @@ var (
 	OutputPath    string
 	CsvEncoding   string
 	ProjectId     string
+	PerPage       int
 )
 
 type Project struct {
@@ -156,10 +157,14 @@ func main() {
 	case "issues", "i":
 		// Get command options
 		var projectId = flag.String("project", "", "Target project ID. Optional.")
+		var perPage = flag.Int("perPage", IssuesPerPage, "Number of issues per page. Optional.")
 		os.Args = flag.Args()
 		flag.Parse()
 		if *projectId != "" {
 			ProjectId = *projectId
+		}
+		if 0 < *perPage {
+			PerPage = *perPage
 		}
 		getIssues()
 	default:
@@ -209,8 +214,12 @@ func getIssues() {
 	if ProjectId != "" {
 		path = "/projects/" + strings.Replace(ProjectId, "/", "%2F", 1)
 	}
+	var perPage int = PerPage
+	if perPage <= 0 {
+		perPage = IssuesPerPage
+	}
 	path += "/issues"
-	params := map[string]string{"per_page": fmt.Sprint(IssuesPerPage)}
+	params := map[string]string{"per_page": fmt.Sprint(perPage)}
 	body, err := accessGitLab(path, "GET", params)
 	if err != nil {
 		os.Exit(ExitCodeError)
